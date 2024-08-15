@@ -61,7 +61,8 @@ def process_file(filename):
     driver = init_driver()
     filepath = os.path.join(embedded_dir, filename)
     df = pd.read_csv(filepath)
-
+    if df['acts'].astype(str).str.len().any():
+        return
     # Add a new 'acts' column by fetching and parsing laws for each 判決字號
     df['acts'] = df['判決字號'].apply(lambda x: fetch_and_parse_laws(driver, x))
 
@@ -77,10 +78,10 @@ def process_file(filename):
     driver.quit()
 
 # Directory where the CSV files are stored
-embedded_dir = '../embedded'
+embedded_dir = '../acts'
 
 # Get the list of CSV files to process
-csv_files = [f for f in os.listdir(embedded_dir) if f.endswith('.csv') and not f.startswith('@')]
+csv_files = [f for f in os.listdir(embedded_dir) if f.endswith('.csv')]
 
 # Process files in parallel using a ThreadPoolExecutor
 with ThreadPoolExecutor(max_workers=16) as executor:
