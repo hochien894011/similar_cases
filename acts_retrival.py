@@ -70,19 +70,16 @@ def process_file(filename):
     driver = init_driver()
     filepath = os.path.join(embedded_dir, filename)
     df = pd.read_csv(filepath)
-    if df['acts'].astype(str).str.len().any():
-        return
-    # Add a new 'acts' column by fetching and parsing laws for each 判決字號
-    df['acts'] = df['判決字號'].apply(lambda x: fetch_and_parse_laws(driver, x))
+
+    # Fetch and parse laws for rows where 'acts' column is empty
+    for index, row in df.iterrows():
+        if row['acts'] == []:
+            df.at[index, 'acts'] = fetch_and_parse_laws(driver, row['判決字號'])
 
     # Save the updated DataFrame with the original filename
     df.to_csv(filepath, index=False)
     
-    # Rename the file by prefixing with '@'
-    new_filename = '@' + filename
-    new_filepath = os.path.join(embedded_dir, new_filename)
-    os.rename(filepath, new_filepath)
-    print(f"Processed and saved as: {new_filename}")
+    print(f"Processed and saved: {filename}")
 
     driver.quit()
 
