@@ -72,6 +72,18 @@ def extract_embeddings_and_labels(dataframe):
     return embeddings, labels
 
 def dbscan_cases(embeddings, labels, epsilon):
+    """ DBSCAN cases and construct case title relation matrix
+
+    Args:
+        embeddings (float[]): list containing embedding data
+        labels (string[]): list containing case title labels
+        epsilon (float, in the interval [0,1]): the epsilon of DBSCAN
+
+    Returns:
+        matrix (int[][]): a matrix represent relationship between two case titles
+        label_list (string[]): list containing case title labels
+    """
+    
     # DBSCAN by correspond epsilon 
     db = DBSCAN(eps=epsilon, min_samples=1).fit(embeddings)
     cluster_labels = db.labels_
@@ -106,6 +118,16 @@ def dbscan_cases(embeddings, labels, epsilon):
     return matrix, label_list
 
 def find_similar_case(matrix, label_list, threshold):
+    """ According to similar case
+
+    Args:
+        matrix (int[][]): a matrix represent relationship between two case titles
+        label_list (string[]): list containing case title labels
+        threshold (float, in the interval [0, 1]): threshold of similarity
+
+    Returns:
+        edges (template(string, string)[]): the relation between two case titles
+    """
     # Calculate fractions for threshold comparison
     real_threshold = threshold * matrix[0][0]
     edges = []
