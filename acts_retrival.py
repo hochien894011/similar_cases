@@ -32,29 +32,38 @@ def init_driver():
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 # Function to fetch and parse laws for a given 判決字號
+
 def fetch_and_parse_laws(driver, case_id):
     prefix = 'https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id='
     suffix = case_id
     url = prefix + suffix
+    
+    max_retries = 20  # Maximum number of retries
+    sleep_duration = 1  # Sleep duration between retries
+    
+    for attempt in range(max_retries):
+        driver.get(url)
+        time.sleep(sleep_duration)
 
-    driver.get(url)
-    time.sleep(5)
+        try:
+            law_div = driver.find_element(By.ID, "JudrelaLaw")
+            laws = law_div.find_elements(By.TAG_NAME, 'li')
 
-    try:
-        law_div = driver.find_element(By.ID, "JudrelaLaw")
-        laws = law_div.find_elements(By.TAG_NAME, 'li')
+            law_list = []
+            if laws:
+                for law in laws:
+                    law_list += parse_laws(law.text)
+                if law_list:  # If law_list is not empty, return it
+                    return law_list
+            # If the list is still empty, retry
+        except Exception as e:
+            print("Error on attempt", attempt + 1, ":", str(e))
+            print("Case ID:", case_id)
+        
+        # If max retries reached, return an empty list
+    print("Max retries reached for Case ID:", case_id)
+    return []
 
-        law_list = []
-        if laws:
-            for law in laws:
-                law_list += parse_laws(law.text)
-            return law_list
-        else:
-            return []
-    except Exception as e:
-        print("Error:", str(e))
-        print(case_id)
-        return []
 
 # Function to process a single CSV file
 def process_file(filename):
