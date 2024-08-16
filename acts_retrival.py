@@ -37,11 +37,11 @@ def fetch_and_parse_laws(driver, case_id):
     prefix = 'https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id='
     suffix = case_id
     url = prefix + suffix
-    
-    max_retries = 20  # Maximum number of retries
-    sleep_duration = 1  # Sleep duration between retries
-    
+    max_retries = 5  # Increase the number of retries
+    sleep_duration = 2  # Increase sleep duration to allow more time between retries
+
     for attempt in range(max_retries):
+        print(f"Attempt {attempt + 1} for case ID: {case_id} with URL: {url}")
         driver.get(url)
         time.sleep(sleep_duration)
 
@@ -52,16 +52,19 @@ def fetch_and_parse_laws(driver, case_id):
             law_list = []
             if laws:
                 for law in laws:
-                    law_list += parse_laws(law.text)
+                    parsed_laws = parse_laws(law.text)
+                    print(f"Parsed laws for {case_id}: {parsed_laws}")
+                    law_list += parsed_laws
                 if law_list:  # If law_list is not empty, return it
                     return law_list
-            # If the list is still empty, retry
+            else:
+                print(f"No laws found in attempt {attempt + 1} for {case_id}.")
         except Exception as e:
-            print("Error on attempt", attempt + 1, ":", str(e))
-            print("Case ID:", case_id)
-        
-        # If max retries reached, return an empty list
-    print("Max retries reached for Case ID:", case_id)
+            print(f"Error on attempt {attempt + 1} for {case_id}: {str(e)}")
+            continue
+
+    # Max retries reached, returning empty list
+    print(f"Max retries reached for {case_id}. Returning empty list.")
     return []
 
 
@@ -71,14 +74,29 @@ def process_file(filename):
     filepath = os.path.join(embedded_dir, filename)
     df = pd.read_csv(filepath)
 
+    # If the 'acts' column doesn't exist, initialize it with empty lists
+    if 'acts' not in df.columns:
+        df['acts'] = [[] for _ in range(len(df))]
+
     # Fetch and parse laws for rows where 'acts' column is empty
     for index, row in df.iterrows():
-        if row['acts'] == []:
-            df.at[index, 'acts'] = fetch_and_parse_laws(driver, row['判決字號'])
+        try:
+            if not row['acts'] or pd.isna(row['acts']) or row['acts'] == "[]":
+                print(f"Fetching laws for: {row['判決字號']}")  # Debugging print
+                df.loc[index, 'acts'] = fetch_and_parse_laws(driver, row['判決字號'])
+                print(f"Result for {row['判決字號']}: {df.loc[index, 'acts']}")  # Debugging print
 
-    # Save the updated DataFrame with the original filename
+            # Intermediate saving to avoid data loss
+            if index % 10 == 0:  # Save every 10 records
+                df.to_csv(filepath, index=False)
+                print(f"Intermediate save after {index + 1} rows.")
+
+        except Exception as e:
+            print(f"Error processing row {index} for {row['判決字號']}: {e}")
+            continue
+
+    # Final save after processing all rows
     df.to_csv(filepath, index=False)
-    
     print(f"Processed and saved: {filename}")
 
     driver.quit()
