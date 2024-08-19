@@ -2,12 +2,14 @@ import os
 import time
 import re
 import pandas as pd
+import signal
+import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Function to parse the laws from the fetched text
 def parse_laws(text):
@@ -32,12 +34,11 @@ def init_driver():
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 # Function to fetch and parse laws for a given 判決字號
-
 def fetch_and_parse_laws(driver, case_id):
     prefix = 'https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id='
     suffix = case_id
     url = prefix + suffix
-    max_retries = 5  # Increase the number of retries
+    max_retries = 2  # Increase the number of retries
     sleep_duration = 2  # Increase sleep duration to allow more time between retries
 
     for attempt in range(max_retries):
@@ -67,7 +68,6 @@ def fetch_and_parse_laws(driver, case_id):
     print(f"Max retries reached for {case_id}. Returning empty list.")
     return []
 
-
 # Function to process a single CSV file
 def process_file(filename):
     driver = init_driver()
@@ -87,7 +87,7 @@ def process_file(filename):
                 print(f"Result for {row['判決字號']}: {df.loc[index, 'acts']}")  # Debugging print
 
             # Intermediate saving to avoid data loss
-            if index % 10 == 0:  # Save every 10 records
+            if index % 100 == 0:  # Save every 100 records
                 df.to_csv(filepath, index=False)
                 print(f"Intermediate save after {index + 1} rows.")
 
@@ -101,6 +101,14 @@ def process_file(filename):
 
     driver.quit()
 
+# Handle termination signal
+def handle_termination(signal, frame):
+    print("Termination signal received. Saving progress and exiting.")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_termination)
+signal.signal(signal.SIGTERM, handle_termination)
+
 # Directory where the CSV files are stored
 embedded_dir = '../acts'
 
@@ -109,4 +117,13 @@ csv_files = [f for f in os.listdir(embedded_dir) if f.endswith('.csv')]
 
 # Process files in parallel using a ThreadPoolExecutor
 with ThreadPoolExecutor(max_workers=16) as executor:
-    executor.map(process_file, csv_files)
+    future_to_file = {executor.submit(process_file, file): file for file in csv_files}
+    try:
+        for future in as_completed(future_to_file):
+            file = future_to_file[future]
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Exception occurred while processing {file}: {e}")
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received. Terminating.")
