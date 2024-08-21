@@ -71,17 +71,17 @@ def extract_embeddings_and_labels(dataframe):
 
     return embeddings, labels
 
-def dbscan_cases(embeddings, labels, epsilon):
+def dbscan_cases(embeddings, labels, epsilon, threshold):
     """ DBSCAN cases and construct case title relation matrix
 
     Args:
         embeddings (float[]): list containing embedding data
         labels (string[]): list containing case title labels
         epsilon (float, in the interval [0,1]): the epsilon of DBSCAN
+        threshold (float, in the interval [0, 1]): threshold of similarity
 
     Returns:
-        matrix (int[][]): a matrix represent relationship between two case titles
-        label_list (string[]): list containing case title labels
+        edges (template(string, string)[]): the relation between two case titles
     """
     
     # DBSCAN by correspond epsilon 
@@ -114,20 +114,6 @@ def dbscan_cases(embeddings, labels, epsilon):
                 matrix[label_idx][other_label_idx] += 1
     
     label_list = list(label_clusters.keys())
-    
-    return matrix, label_list
-
-def find_similar_case(matrix, label_list, threshold):
-    """ According to similar case
-
-    Args:
-        matrix (int[][]): a matrix represent relationship between two case titles
-        label_list (string[]): list containing case title labels
-        threshold (float, in the interval [0, 1]): threshold of similarity
-
-    Returns:
-        edges (template(string, string)[]): the relation between two case titles
-    """
     # Calculate fractions for threshold comparison
     real_threshold = threshold * matrix[0][0]
     edges = []
@@ -137,9 +123,9 @@ def find_similar_case(matrix, label_list, threshold):
             if (matrix[i][j] >= real_threshold and matrix[j][i] >= real_threshold):
                 edges.append((label_list[i], label_list[j]))
     return edges
+
+
+    
+    
     
 
-df = data_processing(200)
-embeddings, labels = extract_embeddings_and_labels(df)
-matrix, label_list = dbscan_cases(embeddings, labels, 0.5)
-edges = find_similar_case(matrix, label_list, 0.5)
